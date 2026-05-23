@@ -47,9 +47,10 @@ function fmt(s: number) {
 interface Props {
   quickTask?: QuickTask | null
   onQuickTaskConsumed?: () => void
+  onOrganized?: () => void
 }
 
-export function LaunchPage({ quickTask, onQuickTaskConsumed }: Props) {
+export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Props) {
   const [phase, setPhase]       = useState<Phase>('input')
   const [text, setText]         = useState('')
   const [tasks, setTasks]       = useState<Task[]>([])
@@ -137,17 +138,15 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed }: Props) {
     setError(null)
     setLoading(true)
     try {
-      const result = await organizeThoughts(text, inspiration.items)
+      const { tasks: result, suggestedTaskIndex } = await organizeThoughts(text, inspiration.items)
       if (!result || result.length === 0) {
         setError('AI 没有返回有效任务，请重新输入')
         return
       }
-      const sid = await createSession(text, result)
-      setSessionId(sid)
-      setTasks(result.map((t, i) => ({ ...t, sessionIndex: i })))
-      setSelected(null)
-      setDoneCount(0)
-      setPhase('tasks')
+      await createSession(text, result, suggestedTaskIndex)
+      // 整理完成 → 跳转到启动页展示任务
+      setText('')
+      onOrganized?.()
     } catch (err: any) {
       setError(err?.message || '整理失败，请重试')
     } finally {

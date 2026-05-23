@@ -30,9 +30,12 @@ export function VinePage({ onQuickStart }: Props) {
   const [expanded, setExpanded]   = useState<number | null>(null)
   const [selected, setSelected]   = useState<QuickTask | null>(null)
 
-  // 读灵感清单（供"建议任务"展示）
-  const inspiration: string[] = (() => {
-    try { return JSON.parse(localStorage.getItem('inspiration') || '[]') } catch { return [] }
+  // 最新 session 中 AI 推荐的建议任务
+  const latestSession = sessions[0]
+  const recommendedTask: QuickTask | null = (() => {
+    if (!latestSession || latestSession.suggestedTaskIndex === undefined) return null
+    const t = latestSession.tasks[latestSession.suggestedTaskIndex]
+    return t ? { content: t.content, estimatedMinutes: t.estimatedMinutes } : null
   })()
 
   useEffect(() => {
@@ -240,16 +243,20 @@ export function VinePage({ onQuickStart }: Props) {
         )}
       </div>
 
-      {/* ── 建议任务条 ──────────────────────────── */}
-      {inspiration.length > 0 && (
-        <div style={{
-          padding: '10px 20px', flexShrink: 0,
-          background: '#FFFBF0',
-          borderTop: '1px solid rgba(251,191,36,0.22)',
-        }}>
+      {/* ── 建议任务条（AI 推荐最重要最紧急那条）── */}
+      {recommendedTask && (
+        <div
+          onClick={() => setSelected(recommendedTask)}
+          style={{
+            padding: '10px 20px', flexShrink: 0,
+            background: selected?.content === recommendedTask.content ? '#FEF9C3' : '#FFFBF0',
+            borderTop: '1px solid rgba(251,191,36,0.22)',
+            cursor: 'pointer',
+          }}
+        >
           <p style={{ fontSize: 13, color: '#92400E', lineHeight: 1.4 }}>
             <span style={{ fontWeight: 600 }}>建议任务：</span>
-            {inspiration[0]}
+            {recommendedTask.content}
           </p>
         </div>
       )}

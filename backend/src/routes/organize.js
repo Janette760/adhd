@@ -36,6 +36,7 @@ router.post('/', async (req, res) => {
 3. 分配预估时间（分钟），范围 5-30 分钟，ADHD 用户适合短时间任务
 4. 难度要有起伏：简单和中等交替安排，不要连续高难度
 5. 总任务量控制在 3-5 条，不要让用户一眼看到太多任务产生焦虑
+6. 从所有任务中选出最重要且最紧急的一条，用 suggestedTaskIndex（从 0 开始的序号）标注
 
 严格返回以下 JSON 格式（不要包含任何其他内容）：
 {
@@ -43,7 +44,8 @@ router.post('/', async (req, res) => {
     {"content": "打开邮箱，找到王经理的未读邮件并回复", "estimatedMinutes": 10},
     {"content": "打开 Excel 模板，填入 3 月的销售数据", "estimatedMinutes": 15},
     {"content": "把桌面文件拖进分类文件夹，清空回收站", "estimatedMinutes": 5}
-  ]
+  ],
+  "suggestedTaskIndex": 0
 }`
         },
         { role: 'user', content: `用户今日核心任务：\n${text}${inspirationSection}` }

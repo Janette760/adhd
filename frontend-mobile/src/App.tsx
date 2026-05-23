@@ -13,12 +13,23 @@ export interface QuickTask {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('launch')
+  const [tab, setTab]         = useState<Tab>('launch')
   const [quickTask, setQuickTask] = useState<QuickTask | null>(null)
+  const [vineKey, setVineKey] = useState(0)
+
+  function handleTabChange(t: Tab) {
+    if (t === 'vine') setVineKey(k => k + 1)
+    setTab(t)
+  }
 
   function handleQuickStart(task: QuickTask) {
     setQuickTask(task)
     setTab('launch')
+  }
+
+  function handleOrganized() {
+    setVineKey(k => k + 1)
+    setTab('vine')
   }
 
   return (
@@ -28,13 +39,14 @@ export default function App() {
           <LaunchPage
             quickTask={quickTask}
             onQuickTaskConsumed={() => setQuickTask(null)}
+            onOrganized={handleOrganized}
           />
         )}
-        {tab === 'vine' && <VinePage onQuickStart={handleQuickStart} />}
+        {tab === 'vine' && <VinePage key={vineKey} onQuickStart={handleQuickStart} />}
         {tab === 'achievement' && <AchievementPage />}
         {tab === 'settings' && <SettingsPage />}
       </div>
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav active={tab} onChange={handleTabChange} />
     </div>
   )
 }

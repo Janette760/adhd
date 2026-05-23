@@ -6,7 +6,12 @@ export interface Task {
   sessionIndex?: number
 }
 
-export async function organizeThoughts(text: string, inspiration?: string[]): Promise<Task[]> {
+export interface OrganizeResult {
+  tasks: Task[]
+  suggestedTaskIndex: number
+}
+
+export async function organizeThoughts(text: string, inspiration?: string[]): Promise<OrganizeResult> {
   const res = await fetch(`${BASE}/organize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -16,7 +21,7 @@ export async function organizeThoughts(text: string, inspiration?: string[]): Pr
     throw new Error(`服务器异常 (${res.status})，请检查后端是否启动`)
   }
   const data = await res.json()
-  return data.tasks ?? []
+  return { tasks: data.tasks ?? [], suggestedTaskIndex: data.suggestedTaskIndex ?? 0 }
 }
 
 export async function getEncouragement(task: string, duration: number): Promise<string> {

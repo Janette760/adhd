@@ -35,9 +35,10 @@ export interface SessionTask {
 // 一次"整理思绪"产生的完整会话
 export interface TaskSession {
   id?: number
-  created_at: number    // 生成时间
-  input_text: string    // 用户原始输入
-  tasks: SessionTask[]  // 任务列表
+  created_at: number           // 生成时间
+  input_text: string           // 用户原始输入
+  tasks: SessionTask[]         // 任务列表
+  suggestedTaskIndex?: number  // AI 推荐的最重要最紧急任务序号
 }
 
 interface AppDB extends DBSchema {
@@ -126,11 +127,16 @@ export async function getAllTasks(): Promise<Task[]> {
 // ══════════════════════════════════
 
 /** 创建新会话，保存 AI 返回的完整任务列表 */
-export async function createSession(inputText: string, tasks: { content: string; estimatedMinutes: number }[]): Promise<number> {
+export async function createSession(
+  inputText: string,
+  tasks: { content: string; estimatedMinutes: number }[],
+  suggestedTaskIndex?: number,
+): Promise<number> {
   const session: Omit<TaskSession, 'id'> = {
     created_at: Date.now(),
     input_text: inputText,
     tasks: tasks.map(t => ({ content: t.content, estimatedMinutes: t.estimatedMinutes, done: false })),
+    suggestedTaskIndex,
   }
   return (await db()).add('task_sessions', session)
 }
