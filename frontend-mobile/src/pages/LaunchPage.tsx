@@ -7,6 +7,7 @@ import { TaskStickyNote } from '../components/TaskStickyNote'
 import { FullscreenCountdown } from '../components/FullscreenCountdown'
 import { EncourageModal } from '../components/EncourageModal'
 import { OttoPet } from '../components/OttoPet'
+import { OtterCarousel } from '../components/OtterCarousel'
 import { addTask, completeTask, incrementStarts, createSession, completeSessionTask } from '../db'
 
 type Phase = 'input' | 'tasks' | 'countdown321' | 'timing_waiting' | 'timing' | 'encouraging'
@@ -236,8 +237,8 @@ export function LaunchPage() {
           {/* 装饰圆 */}
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#FCCB8A', marginBottom: 2 }} />
 
-          {/* Otto */}
-          <OttoPet mood="neutral" size={84} />
+          {/* Otter carousel */}
+          <OtterCarousel size={100} />
 
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a', marginTop: 6 }}>
             现在想做点什么？
