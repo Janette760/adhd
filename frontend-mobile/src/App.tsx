@@ -7,14 +7,30 @@ import { SettingsPage } from './pages/SettingsPage'
 
 export type Tab = 'launch' | 'vine' | 'achievement' | 'settings'
 
+export interface QuickTask {
+  content: string
+  estimatedMinutes: number
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('launch')
+  const [quickTask, setQuickTask] = useState<QuickTask | null>(null)
+
+  function handleQuickStart(task: QuickTask) {
+    setQuickTask(task)
+    setTab('launch')
+  }
 
   return (
     <div className="app">
       <div className="page-content">
-        {tab === 'launch' && <LaunchPage />}
-        {tab === 'vine' && <VinePage />}
+        {tab === 'launch' && (
+          <LaunchPage
+            quickTask={quickTask}
+            onQuickTaskConsumed={() => setQuickTask(null)}
+          />
+        )}
+        {tab === 'vine' && <VinePage onQuickStart={handleQuickStart} />}
         {tab === 'achievement' && <AchievementPage />}
         {tab === 'settings' && <SettingsPage />}
       </div>

@@ -9,6 +9,7 @@ import { EncourageModal } from '../components/EncourageModal'
 import { OttoPet } from '../components/OttoPet'
 import { OtterCarousel } from '../components/OtterCarousel'
 import { addTask, completeTask, incrementStarts, createSession, completeSessionTask } from '../db'
+import type { QuickTask } from '../App'
 
 type Phase = 'input' | 'tasks' | 'countdown321' | 'timing_waiting' | 'timing' | 'encouraging'
 
@@ -43,7 +44,12 @@ function fmt(s: number) {
   return `${m}:${sec}`
 }
 
-export function LaunchPage() {
+interface Props {
+  quickTask?: QuickTask | null
+  onQuickTaskConsumed?: () => void
+}
+
+export function LaunchPage({ quickTask, onQuickTaskConsumed }: Props) {
   const [phase, setPhase]       = useState<Phase>('input')
   const [text, setText]         = useState('')
   const [tasks, setTasks]       = useState<Task[]>([])
@@ -85,6 +91,27 @@ export function LaunchPage() {
   }
 
   useEffect(() => () => stopTimer(), [])
+
+  // 从历史页一键专注：跳过整理步骤，直接倒计时
+  useEffect(() => {
+    if (!quickTask) return
+    const task: Task = { content: quickTask.content, estimatedMinutes: quickTask.estimatedMinutes, sessionIndex: 0 }
+    stopTimer()
+    setEncourage(null)
+    setAllDoneEncourage(null)
+    setError(null)
+    setDoneCount(0)
+    setElapsed(0)
+    elapsedRef.current = 0
+    setTasks([task])
+    setSelected(0)
+    selectedTaskRef.current = task
+    addTask({ category_id: 1, content: quickTask.content, started_at: Date.now() })
+      .then(id => { setTaskId(id); incrementStarts() })
+    setPhase('countdown321')
+    onQuickTaskConsumed?.()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickTask])
 
   // ESP32 → App：开始信号
   const onStartSignal = useCallback(() => {
@@ -241,7 +268,7 @@ export function LaunchPage() {
           <OtterCarousel size={100} />
 
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a', marginTop: 6 }}>
-            现在想做点什么？
+            让我们一起开始！
           </h1>
           <p style={{ fontSize: 14, color: 'rgba(0,0,0,0.48)' }}>
             说一句就好，不用想清楚
