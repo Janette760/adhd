@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getStats, getAllTasks, type Stats } from '../db'
+import { getStats, getAllSessions, type Stats } from '../db'
+
+const GRID_W = 11
+const GRID_H = 11
+const TOTAL = GRID_W * GRID_H
 
 function fmtTime(s: number) {
   const h = Math.floor(s / 3600)
@@ -8,29 +12,81 @@ function fmtTime(s: number) {
   return `${m}分钟`
 }
 
-export function AchievementPage() {
-  const [stats, setStats]   = useState<Stats | null>(null)
-  const [heatmap, setHeatmap] = useState<Record<string, number>>({})
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
 
+function addDays(base: Date, n: number) {
+  const d = new Date(base)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
+export function AchievementPage() {
+  const [stats, setStats]       = useState<Stats | null>(null)
+  const [heatmap, setHeatmap]   = useState<Record<string, number>>({})
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [pixelColors, setPixelColors] = useState<Array<[number, number, number]>>([])
+
+  // Sample pixel colors from otter image via offscreen canvas
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/otter-pixel.png'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = GRID_W
+      canvas.height = GRID_H
+      const ctx = canvas.getContext('2d')!
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(img, 0, 0, GRID_W, GRID_H)
+      const { data } = ctx.getImageData(0, 0, GRID_W, GRID_H)
+      const colors: Array<[number, number, number]> = []
+      for (let i = 0; i < TOTAL; i++) {
+        colors.push([data[i * 4], data[i * 4 + 1], data[i * 4 + 2]])
+      }
+      setPixelColors(colors)
+    }
+  }, [])
+
+  // Load sessions → daily completion counts + earliest start date
   useEffect(() => {
     getStats().then(setStats)
-    getAllTasks().then(tasks => {
+    getAllSessions().then(sessions => {
       const map: Record<string, number> = {}
-      tasks.filter(t => t.completed_at).forEach(t => {
-        const day = new Date(t.completed_at!).toISOString().slice(0, 10)
-        map[day] = (map[day] ?? 0) + 1
+      let earliest = Date.now()
+      sessions.forEach(session => {
+        if (session.created_at < earliest) earliest = session.created_at
+        session.tasks
+          .filter(t => t.done && t.completedAt)
+          .forEach(t => {
+            const day = new Date(t.completedAt!).toISOString().slice(0, 10)
+            map[day] = (map[day] ?? 0) + 1
+          })
       })
       setHeatmap(map)
+      const d = new Date(sessions.length > 0 ? earliest : Date.now())
+      d.setHours(0, 0, 0, 0)
+      setStartDate(d)
     })
   }, [])
 
-  // 最近 49 天（7×7 格）
-  const days: string[] = []
-  for (let i = 48; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(d.toISOString().slice(0, 10))
-  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const activeDays = startDate
+    ? Math.min(Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1, TOTAL)
+    : 0
+
+  const litCells = Array.from({ length: TOTAL }, (_, idx) => {
+    if (idx >= activeDays) return 0
+    const cellDate = startDate ? dayKey(addDays(startDate, idx)) : ''
+    return heatmap[cellDate] ?? 0
+  })
+  const fullyLit = litCells.filter(c => c >= 5).length
+
+  const gap = 2
+  const containerW = Math.min((typeof window !== 'undefined' ? window.innerWidth : 390) - 32, 360)
+  const cellSize = Math.floor((containerW - gap * (GRID_W - 1)) / GRID_W)
 
   return (
     <div style={{ padding: '0 16px 24px' }}>
@@ -51,22 +107,56 @@ export function AchievementPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 24 }}>
-        <p className="section-label">最近 7 周打卡记录</p>
-        <div className="heatmap">
-          {days.map(d => {
-            const count   = heatmap[d] ?? 0
-            const opacity = count === 0 ? 0.07 : Math.min(0.15 + count * 0.25, 1)
+      {/* Pixel otter reveal grid */}
+      <div style={{ marginTop: 28 }}>
+        <p className="section-label">水獭打卡图</p>
+        <p style={{ fontSize: 12, color: 'rgba(0,0,0,0.38)', marginTop: 2, marginBottom: 12 }}>
+          每天完成任务点亮一格，坚持 {TOTAL} 天点亮完整水獭！
+        </p>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${GRID_W}, ${cellSize}px)`,
+          gap,
+          width: 'fit-content',
+          borderRadius: 12,
+          overflow: 'hidden',
+        }}>
+          {Array.from({ length: TOTAL }, (_, idx) => {
+            const count = litCells[idx]
+            const isActive = idx < activeDays
+            const [r, g, b] = pixelColors[idx] ?? [160, 140, 120]
+
+            let bg: string
+            if (!isActive) {
+              // Future day: completely dark
+              bg = 'rgba(0,0,0,0.06)'
+            } else if (count === 0) {
+              // Active but no completions: very faint pixel color
+              bg = `rgba(${r},${g},${b},0.12)`
+            } else {
+              // Lit: opacity grows from 0.2 to 1.0 as count goes 1→5
+              const opacity = 0.2 + Math.min(count / 5, 1) * 0.8
+              bg = `rgba(${r},${g},${b},${opacity})`
+            }
+
             return (
               <div
-                key={d}
-                className="heatmap-cell"
-                style={{ backgroundColor: `rgba(245,158,11,${opacity})` }}
-                title={`${d}：${count} 次`}
+                key={idx}
+                style={{
+                  width: cellSize,
+                  height: cellSize,
+                  backgroundColor: bg,
+                  transition: 'background-color 0.4s ease',
+                }}
               />
             )
           })}
         </div>
+
+        <p style={{ fontSize: 12, color: 'rgba(0,0,0,0.35)', marginTop: 10 }}>
+          已解锁 {activeDays} 天 · 完全点亮 {fullyLit} 格
+        </p>
       </div>
 
       {stats && (
