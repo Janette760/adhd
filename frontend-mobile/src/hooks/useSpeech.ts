@@ -148,7 +148,14 @@ export function useSpeech() {
     updateStreamText('')
     finalizedRef.current = ''
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+      activeRef.current = false
+      alert('无法获取麦克风权限，请在浏览器设置中允许麦克风访问')
+      return
+    }
     // 如果在 getUserMedia 期间被取消了，立即释放资源
     if (!activeRef.current) {
       stream.getTracks().forEach((t) => t.stop())
@@ -198,6 +205,7 @@ export function useSpeech() {
           ws.close()
         } else if (msg.type === 'ERROR') {
           console.error('stt ws error:', msg.error)
+          alert(`语音识别失败：${msg.error}`)
           ws.close()
         }
       } catch {
