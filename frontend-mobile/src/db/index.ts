@@ -152,6 +152,52 @@ export async function getAllSessions(): Promise<TaskSession[]> {
   return sessions.sort((a, b) => b.created_at - a.created_at)
 }
 
+/** 填充演示数据：生成过去 N 天的假会话，用于预览成就页效果 */
+export async function seedDemoData(days = 65) {
+  const d = await db()
+  const inputs = [
+    '整理房间，做作业，跑步半小时',
+    '准备会议材料，回复邮件，买菜',
+    '学习英语，看书，整理笔记',
+    '完成项目报告，打电话给朋友',
+    '锻炼身体，学新技能，做午饭',
+    '清理桌面，写日记，散步',
+    '复习课程，整理文档，联系同学',
+  ]
+  const now = new Date()
+  now.setHours(12, 0, 0, 0)
+  for (let i = days; i >= 0; i--) {
+    if (Math.random() < 0.18) continue          // ~18% 概率跳过某天
+    const dayTs = now.getTime() - i * 86400000
+    const completions = Math.ceil(Math.random() * 5) // 1-5 次完成
+    const taskList = Array.from({ length: completions + 1 }, (_, j) => ({
+      content: `示例任务 ${j + 1}`,
+      estimatedMinutes: 10 + Math.floor(Math.random() * 20),
+      done: j < completions,
+      completedAt: j < completions ? dayTs + j * 1200000 : undefined,
+      durationSeconds: j < completions ? 300 + Math.floor(Math.random() * 900) : undefined,
+    }))
+    const session: Omit<TaskSession, 'id'> = {
+      created_at: dayTs,
+      input_text: inputs[Math.floor(Math.random() * inputs.length)],
+      tasks: taskList,
+      suggestedTaskIndex: 0,
+    }
+    await d.add('task_sessions', session)
+  }
+}
+
+/** 删除所有演示数据（input_text 包含"示例任务"的会话）*/
+export async function clearDemoData() {
+  const d = await db()
+  const all = await d.getAll('task_sessions')
+  for (const s of all) {
+    if (s.tasks.some(t => t.content.startsWith('示例任务'))) {
+      await d.delete('task_sessions', s.id!)
+    }
+  }
+}
+
 /** 标记会话中某条任务为已完成 */
 export async function completeSessionTask(sessionId: number, taskIndex: number, durationSeconds: number) {
   const d = await db()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getStats, getAllSessions, type Stats } from '../db'
+import { getStats, getAllSessions, seedDemoData, clearDemoData, type Stats } from '../db'
 
 const GRID_W = 11
 const GRID_H = 11
@@ -27,6 +27,7 @@ export function AchievementPage() {
   const [heatmap, setHeatmap]   = useState<Record<string, number>>({})
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [pixelColors, setPixelColors] = useState<Array<[number, number, number]>>([])
+  const [seeding, setSeeding]   = useState(false)
 
   // Sample pixel colors from otter image via offscreen canvas
   useEffect(() => {
@@ -48,8 +49,7 @@ export function AchievementPage() {
     }
   }, [])
 
-  // Load sessions → daily completion counts + earliest start date
-  useEffect(() => {
+  function loadData() {
     getStats().then(setStats)
     getAllSessions().then(sessions => {
       const map: Record<string, number> = {}
@@ -68,7 +68,10 @@ export function AchievementPage() {
       d.setHours(0, 0, 0, 0)
       setStartDate(d)
     })
-  }, [])
+  }
+
+  // Load sessions → daily completion counts + earliest start date
+  useEffect(() => { loadData() }, [])
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -167,6 +170,37 @@ export function AchievementPage() {
           </p>
         </div>
       )}
+
+      {/* 演示数据按钮 */}
+      <div style={{ marginTop: 32, display: 'flex', gap: 10 }}>
+        <button
+          disabled={seeding}
+          onClick={async () => {
+            setSeeding(true)
+            await seedDemoData(65)
+            loadData()
+            setSeeding(false)
+          }}
+          style={{
+            flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px dashed rgba(0,0,0,0.18)',
+            background: 'transparent', fontSize: 13, color: 'rgba(0,0,0,0.45)', cursor: 'pointer',
+          }}
+        >
+          {seeding ? '生成中…' : '填充 65 天演示数据'}
+        </button>
+        <button
+          onClick={async () => {
+            await clearDemoData()
+            loadData()
+          }}
+          style={{
+            padding: '10px 16px', borderRadius: 10, border: '1.5px dashed rgba(0,0,0,0.12)',
+            background: 'transparent', fontSize: 13, color: 'rgba(0,0,0,0.3)', cursor: 'pointer',
+          }}
+        >
+          清除
+        </button>
+      </div>
     </div>
   )
 }
