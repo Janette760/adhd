@@ -109,7 +109,7 @@ export function LaunchPage() {
     setError(null)
     setLoading(true)
     try {
-      const result = await organizeThoughts(text)
+      const result = await organizeThoughts(text, inspiration.items)
       if (!result || result.length === 0) {
         setError('AI 没有返回有效任务，请重新输入')
         return

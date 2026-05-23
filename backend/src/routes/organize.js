@@ -8,9 +8,15 @@ function getClient() {
 }
 
 router.post('/', async (req, res) => {
-  const { text } = req.body;
+  const { text, inspiration } = req.body;
   if (!text) return res.status(400).json({ error: 'text required' });
   if (text.length > 1000) return res.status(400).json({ error: '输入过长，请控制在 1000 字以内' });
+
+  const hasInspiration = Array.isArray(inspiration) && inspiration.length > 0;
+
+  const inspirationSection = hasInspiration
+    ? `\n\n用户的灵感清单（平时随手记的其他想法，供你参考）：\n${inspiration.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n灵感清单使用规则：\n- 从中挑选 0-2 条加入今日任务（不要全加）\n- 只在主任务量偏少（少于 3 条）或与主任务搭配有助于难易平衡时才加入\n- 灵感清单里的任务同样要拆解成具体可执行的步骤`
+    : '';
 
   try {
     console.log('[organize] 收到文本:', text.substring(0, 100));
@@ -28,8 +34,8 @@ router.post('/', async (req, res) => {
 1. 编号 1、2、3… 按执行顺序排列
 2. 内容具体可操作，每条 10-20 字，不含模糊词
 3. 分配预估时间（分钟），范围 5-30 分钟，ADHD 用户适合短时间任务
-4. 难度要有起伏：不要连续安排同样难度的任务，比如先一个简单（5-10分钟），再一个中等（10-20分钟），再一个简单… 交替安排
-5. 不要安排大段时间做重复的事情
+4. 难度要有起伏：简单和中等交替安排，不要连续高难度
+5. 总任务量控制在 3-5 条，不要让用户一眼看到太多任务产生焦虑
 
 严格返回以下 JSON 格式（不要包含任何其他内容）：
 {
@@ -40,7 +46,7 @@ router.post('/', async (req, res) => {
   ]
 }`
         },
-        { role: 'user', content: text }
+        { role: 'user', content: `用户今日核心任务：\n${text}${inspirationSection}` }
       ],
       response_format: { type: 'json_object' },
     });

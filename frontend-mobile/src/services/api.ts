@@ -6,11 +6,11 @@ export interface Task {
   sessionIndex?: number
 }
 
-export async function organizeThoughts(text: string): Promise<Task[]> {
+export async function organizeThoughts(text: string, inspiration?: string[]): Promise<Task[]> {
   const res = await fetch(`${BASE}/organize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, inspiration }),
   })
   if (!res.ok) {
     throw new Error(`服务器异常 (${res.status})，请检查后端是否启动`)
