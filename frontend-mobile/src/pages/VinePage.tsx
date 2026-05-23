@@ -186,7 +186,7 @@ export function VinePage({ onQuickStart }: Props) {
           disabled={suggested.length === 0}
           style={{
             flex: 1, padding: '17px',
-            borderRadius: 999, border: 'none',
+            borderRadius: 16, border: 'none',
             background: suggested.length > 0
               ? 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)'
               : 'rgba(0,0,0,0.07)',
