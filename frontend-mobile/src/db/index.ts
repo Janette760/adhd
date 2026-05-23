@@ -140,6 +140,12 @@ export async function getSession(id: number): Promise<TaskSession | undefined> {
   return (await db()).get('task_sessions', id)
 }
 
+/** 获取所有会话（最新在前）*/
+export async function getAllSessions(): Promise<TaskSession[]> {
+  const sessions = await (await db()).getAll('task_sessions')
+  return sessions.sort((a, b) => b.created_at - a.created_at)
+}
+
 /** 标记会话中某条任务为已完成 */
 export async function completeSessionTask(sessionId: number, taskIndex: number, durationSeconds: number) {
   const d = await db()

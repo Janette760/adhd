@@ -11,6 +11,17 @@ import { addTask, completeTask, incrementStarts, createSession, completeSessionT
 
 type Phase = 'input' | 'tasks' | 'countdown321' | 'timing_waiting' | 'timing' | 'encouraging'
 
+// ── 灵感清单 hook（localStorage 持久化）──────────────────────────
+function useInspiration() {
+  const [items, setItems] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('inspiration') || '[]') } catch { return [] }
+  })
+  function save(next: string[]) { setItems(next); localStorage.setItem('inspiration', JSON.stringify(next)) }
+  function add(text: string) { if (text.trim()) save([text.trim(), ...items]) }
+  function remove(i: number) { save(items.filter((_, idx) => idx !== i)) }
+  return { items, add, remove }
+}
+
 const NEXT_TASK_MESSAGES = [
   '太棒了！接下来试试这个～',
   '做得好！下一个也难不倒你 ✨',
@@ -49,6 +60,8 @@ export function LaunchPage() {
   const handleCompleteCallbackRef = useRef<(seconds: number) => Promise<void>>(async () => {})
 
   const { recording, transcribing, streamingText, startRecording, stopRecording } = useSpeech()
+  const inspiration = useInspiration()
+  const [inspireDraft, setInspireDraft] = useState('')
 
   useEffect(() => {
     if (recording) setText(streamingText)
@@ -235,12 +248,12 @@ export function LaunchPage() {
         </div>
 
         {/* 输入区 */}
-        <div style={{ padding: '20px 16px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ padding: '20px 16px 0', flex: 1, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'hidden' }}>
           {error && (
             <div style={{
               padding: '10px 14px', borderRadius: 12,
               background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-              color: '#dc2626', fontSize: 13, lineHeight: 1.5,
+              color: '#dc2626', fontSize: 13, lineHeight: 1.5, flexShrink: 0,
             }}>⚠️ {error}</div>
           )}
           <textarea
@@ -249,9 +262,9 @@ export function LaunchPage() {
             value={text}
             onChange={e => setText(e.target.value)}
             readOnly={recording}
-            style={{ flex: 1, minHeight: 140 }}
+            style={{ minHeight: 120, flexShrink: 0 }}
           />
-          <div className="btn-row" style={{ paddingBottom: 8 }}>
+          <div className="btn-row" style={{ flexShrink: 0 }}>
             <button
               className={`btn btn-record ${recording ? 'recording' : ''}`}
               onPointerDown={startRecording}
@@ -268,6 +281,72 @@ export function LaunchPage() {
             >
               {loading ? '整理中…' : '整理思绪'}
             </button>
+          </div>
+
+          {/* 灵感清单 */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden', paddingBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(0,0,0,0.4)', flexShrink: 0 }}>灵感清单</p>
+
+            {/* 输入行 */}
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <input
+                value={inspireDraft}
+                onChange={e => setInspireDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && inspireDraft.trim()) { inspiration.add(inspireDraft); setInspireDraft('') } }}
+                placeholder="随手记一个想法..."
+                style={{
+                  flex: 1, border: '1.5px solid rgba(0,0,0,0.1)', borderRadius: 999,
+                  padding: '9px 16px', fontSize: 14, fontFamily: 'inherit',
+                  background: '#fafaf8', color: '#1a1a1a', outline: 'none',
+                }}
+              />
+              <button
+                onClick={() => { if (inspireDraft.trim()) { inspiration.add(inspireDraft); setInspireDraft('') } }}
+                disabled={!inspireDraft.trim()}
+                style={{
+                  width: 40, height: 40, borderRadius: 12, border: 'none',
+                  background: '#FCCB8A', color: '#92400E', fontSize: 22, fontWeight: 700,
+                  cursor: 'pointer', flexShrink: 0,
+                  opacity: inspireDraft.trim() ? 1 : 0.5,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                +
+              </button>
+            </div>
+
+            {/* 列表 */}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {inspiration.items.length === 0 && (
+                <p style={{ fontSize: 13, color: 'rgba(0,0,0,0.28)', textAlign: 'center', padding: '16px 0' }}>
+                  点击条目可导入到输入框
+                </p>
+              )}
+              {inspiration.items.map((item, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '11px 14px', borderRadius: 12,
+                    background: '#fff', border: '1px solid rgba(0,0,0,0.07)',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <span
+                    style={{ flex: 1, fontSize: 14, color: '#1a1a1a', lineHeight: 1.4, cursor: 'pointer' }}
+                    onClick={() => setText(item)}
+                  >
+                    {item}
+                  </span>
+                  <button
+                    onClick={() => inspiration.remove(i)}
+                    style={{ color: 'rgba(0,0,0,0.25)', fontSize: 16, background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
