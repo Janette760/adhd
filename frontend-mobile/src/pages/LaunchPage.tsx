@@ -68,13 +68,13 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized, onFocu
   const timerRef   = useRef<number | null>(null)
   const handleCompleteCallbackRef = useRef<(seconds: number) => Promise<void>>(async () => {})
 
-  const { recording, transcribing, streamingText, startRecording, stopRecording } = useSpeech()
+  const { recording, transcribing, streamingText, startRecording, stopRecording } = useSpeech(
+    (result) => { if (result.trim()) setText(result) }
+  )
   const inspiration = useInspiration()
   const [inspireDraft, setInspireDraft] = useState('')
 
-  useEffect(() => {
-    if (recording) setText(streamingText)
-  }, [recording, streamingText])
+  // streamingText → text 由 useSpeech 的 onTranscribed 回调负责，不再用 effect 同步
 
   function startTimer() {
     elapsedRef.current = 0
@@ -299,9 +299,9 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized, onFocu
           <textarea
             className="textarea"
             placeholder="准备周五的小组汇报…"
-            value={text}
-            onChange={e => setText(e.target.value)}
-            readOnly={recording}
+            value={recording || transcribing ? streamingText : text}
+            onChange={e => { if (!recording && !transcribing) setText(e.target.value) }}
+            readOnly={recording || transcribing}
             style={{ minHeight: 120, flexShrink: 0 }}
           />
           <div className="btn-row" style={{ flexShrink: 0 }}>

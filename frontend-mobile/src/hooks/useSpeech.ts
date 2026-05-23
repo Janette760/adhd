@@ -23,7 +23,7 @@ function resampleSimple(samples: Float32Array, fromRate: number): Float32Array {
   return result
 }
 
-export function useSpeech() {
+export function useSpeech(onTranscribed?: (text: string) => void) {
   const [recording, setRecording]       = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [streamingText, setStreamingText] = useState('')
@@ -102,16 +102,14 @@ export function useSpeech() {
 
   function finalize() {
     cleanupAll()
+    const result = finalizedRef.current || streamingTextRef.current
+    setRecording(false)
+    setTranscribing(false)
+    onTranscribed?.(result)
     const resolve = resolveRef.current
     if (resolve) {
       resolveRef.current = null
-      const result = finalizedRef.current || streamingTextRef.current
-      setRecording(false)
-      setTranscribing(false)
       resolve(result)
-    } else {
-      setRecording(false)
-      setTranscribing(false)
     }
   }
 
@@ -181,18 +179,20 @@ export function useSpeech() {
   }, [])
 
   const stopRecording = useCallback((): Promise<string> => {
+    // 防止重复调用（onPointerLeave + onPointerUp 同时触发时）
+    if (!activeRef.current) return Promise.resolve(streamingTextRef.current)
+    activeRef.current = false
+
+    // 立刻把 recording 状态置 false，按钮视觉立即响应
+    setRecording(false)
+    setTranscribing(true)
+
+    const ws = wsRef.current
+    const sourceRate = sourceRateRef.current
+    stopAudio()
+
     return new Promise((resolve) => {
-      activeRef.current = false
-      setTranscribing(true)
-
-      const ws = wsRef.current
-      const sourceRate = sourceRateRef.current
-
-      // 只停音频，保留 WebSocket
-      stopAudio()
-
       if (!ws) {
-        setRecording(false)
         setTranscribing(false)
         resolve(streamingTextRef.current)
         return
@@ -205,17 +205,11 @@ export function useSpeech() {
       }
 
       if (ws.readyState === WebSocket.OPEN) {
-        // WS 已开启，直接发
         sendFinish()
       } else if (ws.readyState === WebSocket.CONNECTING) {
-        // WS 还在连接中，等它开启后再发
         ws.addEventListener('open', sendFinish, { once: true })
-        ws.addEventListener('error', () => {
-          setRecording(false); setTranscribing(false); resolve('')
-        }, { once: true })
+        ws.addEventListener('error', () => { setTranscribing(false); resolve('') }, { once: true })
       } else {
-        // 已关闭
-        setRecording(false)
         setTranscribing(false)
         resolve(streamingTextRef.current)
       }
