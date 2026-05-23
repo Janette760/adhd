@@ -1,34 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getAllSessions, type TaskSession } from '../db'
 import { OtterCarousel } from '../components/OtterCarousel'
 import type { QuickTask } from '../App'
 
 const CN_NUMS = ['一', '二', '三', '四', '五', '六']
 
-function timeAgo(ts: number) {
-  const diff = Date.now() - ts
-  const m = Math.floor(diff / 60000)
-  const h = Math.floor(diff / 3600000)
-  const d = Math.floor(diff / 86400000)
-  if (m < 1)  return '刚刚'
-  if (m < 60) return `${m} 分钟前`
-  if (h < 24) return `${h} 小时前`
-  return `${d} 天前`
-}
-
-function fmt(s: number) {
-  const m = Math.floor(s / 60)
-  return m > 0 ? `${m} 分钟` : `${s} 秒`
-}
+const ENCOURAGEMENTS = [
+  '现在就开始吧！',
+  '选它，立刻行动！',
+  '你可以的！',
+  '一步一步来，先做这个！',
+  '就是它了，冲！',
+]
 
 interface Props {
   onQuickStart: (task: QuickTask) => void
 }
 
 export function VinePage({ onQuickStart }: Props) {
-  const [sessions, setSessions]   = useState<TaskSession[]>([])
-  const [expanded, setExpanded]   = useState<number | null>(null)
-  const [selected, setSelected]   = useState<QuickTask | null>(null)
+  const [sessions, setSessions] = useState<TaskSession[]>([])
+  const [selected, setSelected] = useState<QuickTask | null>(null)
+  const encouragement = useMemo(() => ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)], [])
 
   // 最新 session 中 AI 推荐的建议任务
   const latestSession = sessions[0]
@@ -147,116 +139,34 @@ export function VinePage({ onQuickStart }: Props) {
           })
         )}
 
-        {/* ── 历史记录（折叠在下方）───────────────── */}
-        {sessions.length > 0 && (
-          <>
-            <div style={{ padding: '14px 20px 8px', background: '#EDECE8', marginTop: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(0,0,0,0.45)', letterSpacing: 0.5 }}>
-                历史记录
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 16px 16px' }}>
-              {sessions.map(session => {
-                const id = session.id!
-                const doneCount = session.tasks.filter(t => t.done).length
-                const total = session.tasks.length
-                const isExpanded = expanded === id
-                const allDone = doneCount === total
-                return (
-                  <div key={id} style={{
-                    background: '#fff', borderRadius: 14,
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.06)', overflow: 'hidden',
-                    border: allDone ? '1.5px solid #6ee7b7' : '1.5px solid transparent',
-                  }}>
-                    <div
-                      style={{ padding: '13px 16px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 12 }}
-                      onClick={() => setExpanded(isExpanded ? null : id)}
-                    >
-                      <div style={{
-                        width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
-                        background: allDone ? '#d1fae5' : '#f3f3f0',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 12, fontWeight: 600, marginTop: 1,
-                      }}>
-                        {allDone ? '✓' : `${doneCount}/${total}`}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          fontSize: 14, fontWeight: 600, color: '#1a1a1a',
-                          lineHeight: 1.4, marginBottom: 3,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {session.input_text}
-                        </p>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>{timeAgo(session.created_at)}</span>
-                          {allDone && (
-                            <span style={{ fontSize: 11, background: '#d1fae5', color: '#065f46', borderRadius: 999, padding: '2px 8px', fontWeight: 600 }}>
-                              全部完成
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.3)', marginTop: 3, flexShrink: 0 }}>
-                        {isExpanded ? '▲' : '▼'}
-                      </span>
-                    </div>
-                    {isExpanded && (
-                      <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '6px 16px 12px' }}>
-                        {session.tasks.map((t, i) => (
-                          <div key={i} style={{
-                            display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0',
-                            borderBottom: i < session.tasks.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
-                          }}>
-                            <div style={{
-                              width: 18, height: 18, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-                              background: t.done ? '#059669' : 'transparent',
-                              border: t.done ? 'none' : '2px solid rgba(0,0,0,0.18)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}>
-                              {t.done && <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>✓</span>}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <p style={{
-                                fontSize: 13, lineHeight: 1.4,
-                                color: t.done ? 'rgba(0,0,0,0.38)' : '#1a1a1a',
-                                textDecoration: t.done ? 'line-through' : 'none',
-                              }}>
-                                {t.content}
-                              </p>
-                              <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                                <span style={{ fontSize: 11, color: 'rgba(0,0,0,0.35)' }}>预计 {t.estimatedMinutes} 分钟</span>
-                                {t.done && t.durationSeconds && (
-                                  <span style={{ fontSize: 11, color: '#059669' }}>实际 {fmt(t.durationSeconds)}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
       </div>
 
-      {/* ── 建议任务条（AI 推荐最重要最紧急那条）── */}
+      {/* ── 建议任务卡（AI 推荐最重要最紧急那条）── */}
       {recommendedTask && (
         <div
           onClick={() => setSelected(recommendedTask)}
           style={{
-            padding: '10px 20px', flexShrink: 0,
-            background: selected?.content === recommendedTask.content ? '#FEF9C3' : '#FFFBF0',
-            borderTop: '1px solid rgba(251,191,36,0.22)',
+            margin: '0 16px 12px', flexShrink: 0,
+            background: selected?.content === recommendedTask.content
+              ? 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)'
+              : 'linear-gradient(135deg, #FFFBF0 0%, #FEF3C7 100%)',
+            border: `2px solid ${selected?.content === recommendedTask.content ? '#F59E0B' : 'rgba(251,191,36,0.45)'}`,
+            borderRadius: 16,
+            padding: '16px 18px',
             cursor: 'pointer',
+            boxShadow: '0 3px 14px rgba(251,191,36,0.2)',
+            transition: 'all 0.15s ease',
           }}
         >
-          <p style={{ fontSize: 13, color: '#92400E', lineHeight: 1.4 }}>
-            <span style={{ fontWeight: 600 }}>建议任务：</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{ fontSize: 15 }}>⭐</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309', letterSpacing: 0.5 }}>建议任务</span>
+          </div>
+          <p style={{ fontSize: 16, fontWeight: 600, color: '#78350F', lineHeight: 1.45, marginBottom: 8 }}>
             {recommendedTask.content}
+          </p>
+          <p style={{ fontSize: 13, color: '#D97706', fontWeight: 500 }}>
+            {encouragement}
           </p>
         </div>
       )}
