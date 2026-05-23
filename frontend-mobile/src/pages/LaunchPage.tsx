@@ -48,9 +48,10 @@ interface Props {
   quickTask?: QuickTask | null
   onQuickTaskConsumed?: () => void
   onOrganized?: () => void
+  onFocusDone?: () => void
 }
 
-export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Props) {
+export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized, onFocusDone }: Props) {
   const [phase, setPhase]       = useState<Phase>('input')
   const [text, setText]         = useState('')
   const [tasks, setTasks]       = useState<Task[]>([])
@@ -93,10 +94,14 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Prop
 
   useEffect(() => () => stopTimer(), [])
 
-  // 从历史页一键专注：跳过整理步骤，直接倒计时
+  // 从启动页一键专注：跳过整理步骤，直接倒计时
   useEffect(() => {
     if (!quickTask) return
-    const task: Task = { content: quickTask.content, estimatedMinutes: quickTask.estimatedMinutes, sessionIndex: 0 }
+    const task: Task = {
+      content: quickTask.content,
+      estimatedMinutes: quickTask.estimatedMinutes,
+      sessionIndex: quickTask.taskIndex ?? 0,
+    }
     stopTimer()
     setEncourage(null)
     setAllDoneEncourage(null)
@@ -107,6 +112,7 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Prop
     setTasks([task])
     setSelected(0)
     selectedTaskRef.current = task
+    if (quickTask.sessionId !== undefined) setSessionId(quickTask.sessionId)
     addTask({ category_id: 1, content: quickTask.content, started_at: Date.now() })
       .then(id => { setTaskId(id); incrementStarts() })
     setPhase('countdown321')
@@ -143,9 +149,13 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Prop
         setError('AI 没有返回有效任务，请重新输入')
         return
       }
-      await createSession(text, result, suggestedTaskIndex)
-      // 整理完成 → 跳转到启动页展示任务
+      const sid = await createSession(text, result, suggestedTaskIndex)
+      setSessionId(sid)
+      setTasks(result)
+      setSelected(suggestedTaskIndex ?? null)
       setText('')
+      setDoneCount(0)
+      setPhase('tasks')
       onOrganized?.()
     } catch (err: any) {
       setError(err?.message || '整理失败，请重试')
@@ -210,8 +220,11 @@ export function LaunchPage({ quickTask, onQuickTaskConsumed, onOrganized }: Prop
 
   function handleContinue() {
     setEncourage(null)
-    if (tasks.length > 0) {
-      setSelected(null)
+    if (onFocusDone) {
+      // 从启动页发起的专注：完成后返回启动页，由启动页处理后续任务和全部完成
+      onFocusDone()
+    } else if (tasks.length > 0) {
+      setSelected(0)
       setPhase('tasks')
     } else {
       const finalMsg = FINAL_ENCOURAGEMENTS[Math.floor(Math.random() * FINAL_ENCOURAGEMENTS.length)]

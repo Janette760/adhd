@@ -10,6 +10,8 @@ export type Tab = 'launch' | 'vine' | 'achievement' | 'settings'
 export interface QuickTask {
   content: string
   estimatedMinutes: number
+  sessionId?: number
+  taskIndex?: number
 }
 
 export default function App() {
@@ -32,6 +34,11 @@ export default function App() {
     setTab('vine')
   }
 
+  function handleFocusDone() {
+    setVineKey(k => k + 1)
+    setTab('vine')
+  }
+
   return (
     <div className="app">
       <div className="page-content">
@@ -40,6 +47,7 @@ export default function App() {
             quickTask={quickTask}
             onQuickTaskConsumed={() => setQuickTask(null)}
             onOrganized={handleOrganized}
+            onFocusDone={handleFocusDone}
           />
         )}
         {tab === 'vine' && <VinePage key={vineKey} onQuickStart={handleQuickStart} />}

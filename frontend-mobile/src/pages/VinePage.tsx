@@ -3,7 +3,7 @@ import { getAllSessions, type TaskSession } from '../db'
 import { OtterCarousel } from '../components/OtterCarousel'
 import type { QuickTask } from '../App'
 
-const CN_NUMS = ['一', '二', '三', '四', '五', '六']
+const CN_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
 const ENCOURAGEMENTS = [
   '现在就开始吧！',
@@ -13,42 +13,96 @@ const ENCOURAGEMENTS = [
   '就是它了，冲！',
 ]
 
+const ALL_DONE_MSGS = [
+  '🎊 天呐你太厉害了！所有任务都完成了！\n\n今天的你简直无敌，每一分钟都在认真对待自己。好好休息一下吧，你值得！🌈',
+  '🏆 全员通关！\n\n看看今天完成了多少事——你把一团乱麻变成了一项项成就。给自己鼓个掌吧！✨',
+  '🎉 哇哇哇全做完了！\n\n最难的是开始，而你不仅开始了，还一口气做到了最后。今天的大赢家就是你！💖',
+]
+
 interface Props {
   onQuickStart: (task: QuickTask) => void
 }
 
 export function VinePage({ onQuickStart }: Props) {
-  const [sessions, setSessions] = useState<TaskSession[]>([])
-  const [selected, setSelected] = useState<QuickTask | null>(null)
-  const encouragement = useMemo(() => ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)], [])
-
-  // 最新 session 中 AI 推荐的建议任务
-  const latestSession = sessions[0]
-  const recommendedTask: QuickTask | null = (() => {
-    if (!latestSession || latestSession.suggestedTaskIndex === undefined) return null
-    const t = latestSession.tasks[latestSession.suggestedTaskIndex]
-    return t ? { content: t.content, estimatedMinutes: t.estimatedMinutes } : null
-  })()
+  const [sessions, setSessions]       = useState<TaskSession[]>([])
+  const [loaded, setLoaded]           = useState(false)
+  const [selected, setSelected]       = useState<QuickTask | null>(null)
+  const [allDoneDismissed, setAllDoneDismissed] = useState(false)
+  const encouragement = useMemo(
+    () => ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)], []
+  )
+  const allDoneMsg = useMemo(
+    () => ALL_DONE_MSGS[Math.floor(Math.random() * ALL_DONE_MSGS.length)], []
+  )
 
   useEffect(() => {
-    getAllSessions().then(setSessions)
+    getAllSessions().then(s => { setSessions(s); setLoaded(true) })
   }, [])
 
-  // 近3次会话里未完成的任务，最多5条
-  const suggested: QuickTask[] = []
-  for (const session of sessions.slice(0, 3)) {
-    for (const t of session.tasks) {
-      if (!t.done && suggested.length < 5 && !suggested.some(s => s.content === t.content)) {
-        suggested.push({ content: t.content, estimatedMinutes: t.estimatedMinutes })
-      }
-    }
+  // Reset dismissal when a new session is added (user organized again)
+  useEffect(() => { setAllDoneDismissed(false) }, [sessions.length])
+
+  const latestSession = sessions[0] as TaskSession | undefined
+  const allTasks      = latestSession?.tasks ?? []
+  const pendingItems  = allTasks
+    .map((t, i) => ({ ...t, sessionId: latestSession!.id!, taskIndex: i }))
+    .filter(t => !t.done)
+
+  const allDone = loaded && !!latestSession && allTasks.length > 0 && pendingItems.length === 0
+
+  function rowLabel(taskIndex: number, total: number) {
+    if (total >= 3 && taskIndex === total - 1) return '生活小记'
+    return `任务${CN_NUMS[taskIndex] ?? taskIndex + 1}`
   }
 
-  // 行标签：倒数第一条（且总数≥3）标为"生活小记"，其余标"任务X"
-  function rowLabel(i: number, total: number) {
-    if (total >= 3 && i === total - 1) return '生活小记'
-    return `任务${CN_NUMS[i] ?? i + 1}`
+  // ── 全部完成庆祝页 ────────────────────────
+  if (allDone && !allDoneDismissed) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        background: 'linear-gradient(170deg, #fbc8dc 0%, #fecdd3 45%, #fee2e2 100%)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', padding: '56px 24px 40px',
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🏆</div>
+          <p style={{ fontSize: 22, fontWeight: 800, color: '#9f1239', letterSpacing: 2 }}>全部完成！</p>
+        </div>
+        <OtterCarousel size={100} />
+        <div style={{
+          marginTop: 24, background: 'rgba(255,255,255,0.82)',
+          borderRadius: 20, padding: '20px 24px', width: '100%',
+          textAlign: 'center', backdropFilter: 'blur(6px)',
+        }}>
+          <p style={{ fontSize: 15, fontWeight: 500, lineHeight: 1.85, color: '#1a1a1a', whiteSpace: 'pre-line' }}>
+            {allDoneMsg}
+          </p>
+        </div>
+        <button
+          onClick={() => setAllDoneDismissed(true)}
+          style={{
+            marginTop: 'auto', width: '100%', padding: '16px',
+            borderRadius: 16, background: 'rgba(255,255,255,0.9)',
+            border: 'none', fontSize: 16, fontWeight: 600,
+            color: '#1a1a1a', cursor: 'pointer',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+          }}
+        >
+          🌟 太棒了！
+        </button>
+      </div>
+    )
   }
+
+  // ── 建议任务（始终是第一条待办）────────────
+  const recommendedTask = pendingItems[0]
+    ? {
+        content:          pendingItems[0].content,
+        estimatedMinutes: pendingItems[0].estimatedMinutes,
+        sessionId:        pendingItems[0].sessionId,
+        taskIndex:        pendingItems[0].taskIndex,
+      }
+    : null
 
   return (
     <div style={{
@@ -70,39 +124,39 @@ export function VinePage({ onQuickStart }: Props) {
         </h1>
       </div>
 
-      {/* ── 今日计划时间表 section header ───────── */}
-      <div style={{
-        padding: '9px 16px 7px',
-        background: '#EDECE8',
-        flexShrink: 0,
-      }}>
+      {/* ── section header ─────────────────────── */}
+      <div style={{ padding: '9px 16px 7px', background: '#EDECE8', flexShrink: 0 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(0,0,0,0.45)', letterSpacing: 0.5 }}>
           今日计划时间表
         </span>
       </div>
 
-      {/* ── 主内容（可滚动）────────────────────── */}
+      {/* ── 任务列表（可滚动）─────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', background: '#fff' }}>
-
-        {/* 建议任务列表（行列样式）*/}
-        {suggested.length === 0 ? (
+        {!loaded ? null : pendingItems.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             gap: 10, padding: '44px 0', color: 'rgba(0,0,0,0.3)',
           }}>
-            <span style={{ fontSize: 36 }}>🎉</span>
+            <span style={{ fontSize: 36 }}>📋</span>
             <p style={{ fontSize: 14, textAlign: 'center', lineHeight: 1.8 }}>
-              今日任务已全部完成！<br />去首页再整理一轮吧～
+              今日还没有任务<br />去记录页整理一下吧～
             </p>
           </div>
         ) : (
-          suggested.map((task, i) => {
-            const isSel = selected?.content === task.content
-            const label = rowLabel(i, suggested.length)
+          pendingItems.map((task, i) => {
+            const qt: QuickTask = {
+              content: task.content,
+              estimatedMinutes: task.estimatedMinutes,
+              sessionId: task.sessionId,
+              taskIndex: task.taskIndex,
+            }
+            const isSel  = selected?.content === task.content
+            const label  = rowLabel(task.taskIndex, allTasks.length)
             return (
               <div
-                key={i}
-                onClick={() => setSelected(isSel ? null : task)}
+                key={task.taskIndex}
+                onClick={() => setSelected(isSel ? null : qt)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   padding: '14px 20px',
@@ -138,24 +192,20 @@ export function VinePage({ onQuickStart }: Props) {
             )
           })
         )}
-
       </div>
 
-      {/* ── 建议任务卡（AI 推荐最重要最紧急那条，兜底用第一条）── */}
-      {(recommendedTask ?? suggested[0]) && (
+      {/* ── 建议任务卡 ─────────────────────────── */}
+      {recommendedTask && (
         <div
-          onClick={() => setSelected(recommendedTask ?? suggested[0]!)}
+          onClick={() => setSelected(recommendedTask)}
           style={{
             margin: '0 16px 12px', flexShrink: 0,
-            background: selected?.content === (recommendedTask ?? suggested[0])?.content
+            background: selected?.content === recommendedTask.content
               ? 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)'
               : 'linear-gradient(135deg, #FFFBF0 0%, #FEF3C7 100%)',
-            border: `2px solid ${selected?.content === (recommendedTask ?? suggested[0])?.content ? '#F59E0B' : 'rgba(251,191,36,0.45)'}`,
-            borderRadius: 16,
-            padding: '16px 18px',
-            cursor: 'pointer',
-            boxShadow: '0 3px 14px rgba(251,191,36,0.2)',
-            transition: 'all 0.15s ease',
+            border: `2px solid ${selected?.content === recommendedTask.content ? '#F59E0B' : 'rgba(251,191,36,0.45)'}`,
+            borderRadius: 16, padding: '16px 18px', cursor: 'pointer',
+            boxShadow: '0 3px 14px rgba(251,191,36,0.2)', transition: 'all 0.15s ease',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -163,49 +213,42 @@ export function VinePage({ onQuickStart }: Props) {
             <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309', letterSpacing: 0.5 }}>建议任务</span>
           </div>
           <p style={{ fontSize: 16, fontWeight: 600, color: '#78350F', lineHeight: 1.45, marginBottom: 8 }}>
-            {(recommendedTask ?? suggested[0])!.content}
+            {recommendedTask.content}
           </p>
-          <p style={{ fontSize: 13, color: '#D97706', fontWeight: 500 }}>
-            {encouragement}
-          </p>
+          <p style={{ fontSize: 13, color: '#D97706', fontWeight: 500 }}>{encouragement}</p>
         </div>
       )}
 
-      {/* ── 一键启动 ────────────────────────────── */}
+      {/* ── 一键启动 ───────────────────────────── */}
       <div style={{
         padding: '14px 20px 18px', flexShrink: 0,
-        background: '#fff',
-        borderTop: '1px solid rgba(0,0,0,0.07)',
+        background: '#fff', borderTop: '1px solid rgba(0,0,0,0.07)',
         display: 'flex', alignItems: 'center', gap: 14,
       }}>
         <button
           onClick={() => {
-            const task = selected ?? suggested[0] ?? null
+            const task = selected ?? recommendedTask
             if (task) onQuickStart(task)
           }}
-          disabled={suggested.length === 0}
+          disabled={!recommendedTask}
           style={{
             flex: 1, padding: '17px',
             borderRadius: 16, border: 'none',
-            background: suggested.length > 0
+            background: recommendedTask
               ? 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)'
               : 'rgba(0,0,0,0.07)',
-            color: suggested.length > 0 ? '#fff' : 'rgba(0,0,0,0.28)',
+            color: recommendedTask ? '#fff' : 'rgba(0,0,0,0.28)',
             fontSize: 17, fontWeight: 700,
-            cursor: suggested.length > 0 ? 'pointer' : 'default',
-            boxShadow: suggested.length > 0 ? '0 5px 20px rgba(251,191,36,0.4)' : 'none',
-            transition: 'all 0.2s ease',
-            letterSpacing: 0.5,
+            cursor: recommendedTask ? 'pointer' : 'default',
+            boxShadow: recommendedTask ? '0 5px 20px rgba(251,191,36,0.4)' : 'none',
+            transition: 'all 0.2s ease', letterSpacing: 0.5,
           }}
         >
           一键启动
         </button>
-
-        {/* 线框图右侧小圆点（呼应物理设备按钮）*/}
         <div style={{
           width: 14, height: 14, borderRadius: '50%',
-          background: 'rgba(0,0,0,0.18)',
-          flexShrink: 0,
+          background: 'rgba(0,0,0,0.18)', flexShrink: 0,
         }} />
       </div>
     </div>
