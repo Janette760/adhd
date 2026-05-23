@@ -1,9 +1,9 @@
 import type { Tab } from '../App'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'launch',      label: '启动',  icon: '⚡' },
-  { id: 'vine',        label: '历史',  icon: '📋' },
-  { id: 'achievement', label: '成就',  icon: '🏆' },
+  { id: 'launch',      label: '记录',  icon: '⚡' },
+  { id: 'vine',        label: '启动',  icon: '📋' },
+  { id: 'achievement', label: '总结',  icon: '🏆' },
   { id: 'settings',   label: '设置',  icon: '⚙️' },
 ]
 
