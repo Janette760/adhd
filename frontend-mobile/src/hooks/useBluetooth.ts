@@ -1,24 +1,31 @@
 import { useState, useRef, useCallback } from 'react'
 
-// UUIDs 需与 ESP32 固件保持一致
-const SERVICE_UUID     = '12345678-1234-1234-1234-123456789abc'
-const BUZZER_CHAR_UUID = '12345678-1234-1234-1234-123456789ab1'
-const TAP_CHAR_UUID    = '12345678-1234-1234-1234-123456789ab2'
+// ── UUID 需与 ESP32 固件保持一致 ─────────────────────────
+const SERVICE_UUID  = '12345678-1234-1234-1234-123456789abc'
+const WRITE_CHAR    = '12345678-1234-1234-1234-123456789ab1' // App → ESP32（写）
+const NOTIFY_CHAR   = '12345678-1234-1234-1234-123456789ab2' // ESP32 → App（通知）
+
+// ── 信号值定义（与 ESP32 固件约定一致）────────────────────
+const CMD_PLAY_MUSIC = 0x01 // App → ESP32：播放专注音乐
+const SIG_START      = 0x01 // ESP32 → App：开始计时
+const SIG_STOP       = 0x02 // ESP32 → App：结束计时
 
 interface Props {
-  onFirstSignal: () => void   // ESP32 第一次信号 → 开始计时
-  onSecondSignal: () => void  // ESP32 第二次信号 → 停止计时
+  onStartSignal: () => void // 收到 ESP32 开始信号
+  onStopSignal:  () => void // 收到 ESP32 结束信号
 }
 
-export function useBluetooth({ onFirstSignal, onSecondSignal }: Props) {
-  const [connected, setConnected] = useState(false)
+export function useBluetooth({ onStartSignal, onStopSignal }: Props) {
+  const [connected, setConnected]   = useState(false)
   const [connecting, setConnecting] = useState(false)
-  const buzzerRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null)
-  const tapCountRef = useRef(0)
-  const onFirstRef = useRef(onFirstSignal)
-  const onSecondRef = useRef(onSecondSignal)
-  onFirstRef.current = onFirstSignal
-  onSecondRef.current = onSecondSignal
+
+  const writeCharRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null)
+
+  // 始终持有最新回调，避免 stale closure
+  const onStartRef = useRef(onStartSignal)
+  const onStopRef  = useRef(onStopSignal)
+  onStartRef.current = onStartSignal
+  onStopRef.current  = onStopSignal
 
   const connect = useCallback(async () => {
     if (!navigator.bluetooth) {
@@ -34,56 +41,50 @@ export function useBluetooth({ onFirstSignal, onSecondSignal }: Props) {
       const server  = await device.gatt!.connect()
       const service = await server.getPrimaryService(SERVICE_UUID)
 
-      buzzerRef.current = await service.getCharacteristic(BUZZER_CHAR_UUID)
+      // 写特征：App 发指令给 ESP32
+      writeCharRef.current = await service.getCharacteristic(WRITE_CHAR)
 
-      // 监听 ESP32 发来的信号
-      const tapChar = await service.getCharacteristic(TAP_CHAR_UUID)
-      await tapChar.startNotifications()
-      tapCountRef.current = 0
+      // 通知特征：接收 ESP32 发来的信号
+      const notifyChar = await service.getCharacteristic(NOTIFY_CHAR)
+      await notifyChar.startNotifications()
 
-      tapChar.addEventListener('characteristicvaluechanged', () => {
-        tapCountRef.current += 1
-        if (tapCountRef.current === 1) {
-          onFirstRef.current()
-        } else if (tapCountRef.current === 2) {
-          onSecondRef.current()
+      notifyChar.addEventListener('characteristicvaluechanged', (event: Event) => {
+        const char = event.target as BluetoothRemoteGATTCharacteristic
+        if (!char.value) return
+        const signal = char.value.getUint8(0)
+        console.log('[BLE] 收到信号值:', signal)
+        if (signal === SIG_START) {
+          onStartRef.current()
+        } else if (signal === SIG_STOP) {
+          onStopRef.current()
         }
       })
 
       device.addEventListener('gattserverdisconnected', () => {
         setConnected(false)
-        buzzerRef.current = null
+        writeCharRef.current = null
+        console.log('[BLE] 设备已断开')
       })
+
       setConnected(true)
+      console.log('[BLE] 已连接')
     } catch (e) {
-      console.error('BLE connect failed', e)
+      console.error('[BLE] 连接失败', e)
     } finally {
       setConnecting(false)
     }
   }, [])
 
-  // 发送"播放音乐"信号到 ESP32
-  const sendMusicSignal = useCallback(async () => {
-    if (!buzzerRef.current) return
-    tapCountRef.current = 0 // 每次新任务重置计数
-    await buzzerRef.current.writeValue(new Uint8Array([1]))
+  // App → ESP32：发送播放音乐指令
+  const sendPlayMusic = useCallback(async () => {
+    if (!writeCharRef.current) return
+    await writeCharRef.current.writeValue(new Uint8Array([CMD_PLAY_MUSIC]))
+    console.log('[BLE] 已发送播放音乐指令')
   }, [])
 
-  // 模拟信号：无 ESP32 时用于测试
-  const simulateFirstSignal = useCallback(() => {
-    onFirstRef.current()
-  }, [])
+  // 未连接设备时的软件备用接口（触发相同逻辑）
+  const simulateStart = useCallback(() => onStartRef.current(), [])
+  const simulateStop  = useCallback(() => onStopRef.current(), [])
 
-  const simulateSecondSignal = useCallback(() => {
-    onSecondRef.current()
-  }, [])
-
-  return {
-    connected,
-    connecting,
-    connect,
-    sendMusicSignal,
-    simulateFirstSignal,
-    simulateSecondSignal,
-  }
+  return { connected, connecting, connect, sendPlayMusic, simulateStart, simulateStop }
 }

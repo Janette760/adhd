@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { organizeThoughts, getEncouragement } from '../services/api'
 import type { Task } from '../services/api'
 import { useSpeech } from '../hooks/useSpeech'
-import { useBluetooth } from '../hooks/useBluetooth'
+import { useDevice } from '../hooks/useDevice'
 import { TaskStickyNote } from '../components/TaskStickyNote'
 import { FullscreenCountdown } from '../components/FullscreenCountdown'
 import { EncourageModal } from '../components/EncourageModal'
@@ -72,24 +72,24 @@ export function LaunchPage() {
 
   useEffect(() => () => stopTimer(), [])
 
-  const onFirstSignal = useCallback(() => {
+  // ESP32 → App：开始信号
+  const onStartSignal = useCallback(() => {
     startTimer()
     setPhase('timing')
   }, [])
 
-  const onSecondSignal = useCallback(() => {
+  // ESP32 → App：结束信号
+  const onStopSignal = useCallback(() => {
     stopTimer()
     handleCompleteCallbackRef.current(elapsedRef.current)
   }, [])
 
   const {
     connected,
-    connecting,
-    connect,
-    sendMusicSignal,
-    simulateFirstSignal,
-    simulateSecondSignal,
-  } = useBluetooth({ onFirstSignal, onSecondSignal })
+    sendPlayMusic,
+    simulateStart,
+    simulateStop,
+  } = useDevice({ onStartSignal, onStopSignal })
 
   async function handleOrganize() {
     if (!text.trim()) return
@@ -129,7 +129,7 @@ export function LaunchPage() {
   }
 
   function handleCountdownDone() {
-    sendMusicSignal()
+    sendPlayMusic()
     setPhase('timing_waiting')
   }
 
@@ -211,16 +211,14 @@ export function LaunchPage() {
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           gap: 10, textAlign: 'center', position: 'relative',
         }}>
-          {/* BLE 状态 */}
-          <button
+          {/* 设备状态 */}
+          <div
             className={`pill ${connected ? 'connected' : ''}`}
-            onClick={connect}
-            disabled={connecting}
             style={{ position: 'absolute', top: 14, right: 16 }}
           >
             <span>{connected ? '●' : '○'}</span>
-            {connecting ? '连接中…' : connected ? '已连接' : '连接设备'}
-          </button>
+            {connected ? '设备已连接' : '等待设备'}
+          </div>
 
           {/* 装饰圆 */}
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#FCCB8A', marginBottom: 2 }} />
@@ -283,10 +281,10 @@ export function LaunchPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 16px 0', flex: 1 }}>
         <div className="ble-status-bar">
-          <button className={`pill ${connected ? 'connected' : ''}`} onClick={connect} disabled={connecting}>
+          <div className={`pill ${connected ? 'connected' : ''}`}>
             <span>{connected ? '●' : '○'}</span>
-            {connecting ? '连接中…' : connected ? '已连接' : '连接设备'}
-          </button>
+            {connected ? '设备已连接' : '等待设备'}
+          </div>
         </div>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>
           {doneCount > 0 ? nextTaskMsg : '我帮你整理好了最易执行的清单 ✨'}
@@ -394,29 +392,47 @@ export function LaunchPage() {
             <p style={{ fontSize: 13, color: '#065f46', opacity: 0.85 }}>Otto 和你一起专注</p>
           </div>
 
-          {/* 标记完成按钮 */}
+          {/* 底部操作区：已连接显示提示，未连接显示软件按钮 */}
           <div style={{ marginTop: 'auto' }}>
-            <button
-              onClick={isTiming ? simulateSecondSignal : simulateFirstSignal}
-              style={{
+            {connected ? (
+              // ESP32 已连接：轻拍设备即可触发，显示提示即可
+              <div style={{
                 width: '100%',
-                background: 'rgba(255,255,255,0.8)',
-                borderRadius: 18,
-                padding: '18px',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 4,
-                boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-                border: 'none', cursor: 'pointer',
+                background: 'rgba(255,255,255,0.45)',
+                borderRadius: 18, padding: '18px',
+                textAlign: 'center',
                 backdropFilter: 'blur(4px)',
-              }}
-            >
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#022c22' }}>
-                {isTiming ? '标记完成' : '开始计时'}
-              </span>
-              <span style={{ fontSize: 12, color: '#065f46', opacity: 0.65 }}>
-                {isTiming ? '（或轻拍设备）' : '（或等待设备信号）'}
-              </span>
-            </button>
+              }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: '#022c22' }}>
+                  {isTiming ? '轻拍设备结束专注' : '轻拍设备开始专注'}
+                </p>
+                <p style={{ fontSize: 12, color: '#065f46', opacity: 0.65, marginTop: 4 }}>
+                  设备已连接，等待你的指令
+                </p>
+              </div>
+            ) : (
+              // 未连接：软件按钮作为备用接口
+              <button
+                onClick={isTiming ? simulateStop : simulateStart}
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.8)',
+                  borderRadius: 18, padding: '18px',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 4,
+                  boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
+                  border: 'none', cursor: 'pointer',
+                  backdropFilter: 'blur(4px)',
+                }}
+              >
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#022c22' }}>
+                  {isTiming ? '标记完成' : '开始计时'}
+                </span>
+                <span style={{ fontSize: 12, color: '#065f46', opacity: 0.65 }}>
+                  未连接设备时可手动操作
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </div>

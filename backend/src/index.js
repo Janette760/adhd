@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const { handleSttWs } = require('./ws/sttHandler');
+const { handleAppWs, handleDeviceWs } = require('./ws/deviceHub');
 
 const app = express();
 
@@ -27,13 +28,21 @@ app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
-// WebSocket 路由：只处理 /ws/stt 路径
+// WebSocket 路由
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url, `http://${request.headers.host}`);
 
   if (pathname === '/ws/stt') {
     wss.handleUpgrade(request, socket, head, (ws) => {
       handleSttWs(ws);
+    });
+  } else if (pathname === '/ws/app') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      handleAppWs(ws);
+    });
+  } else if (pathname === '/ws/device') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      handleDeviceWs(ws);
     });
   } else {
     socket.destroy();
