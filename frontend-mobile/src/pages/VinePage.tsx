@@ -141,16 +141,16 @@ export function VinePage({ onQuickStart }: Props) {
 
       </div>
 
-      {/* ── 建议任务卡（AI 推荐最重要最紧急那条）── */}
-      {recommendedTask && (
+      {/* ── 建议任务卡（AI 推荐最重要最紧急那条，兜底用第一条）── */}
+      {(recommendedTask ?? suggested[0]) && (
         <div
-          onClick={() => setSelected(recommendedTask)}
+          onClick={() => setSelected(recommendedTask ?? suggested[0]!)}
           style={{
             margin: '0 16px 12px', flexShrink: 0,
-            background: selected?.content === recommendedTask.content
+            background: selected?.content === (recommendedTask ?? suggested[0])?.content
               ? 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)'
               : 'linear-gradient(135deg, #FFFBF0 0%, #FEF3C7 100%)',
-            border: `2px solid ${selected?.content === recommendedTask.content ? '#F59E0B' : 'rgba(251,191,36,0.45)'}`,
+            border: `2px solid ${selected?.content === (recommendedTask ?? suggested[0])?.content ? '#F59E0B' : 'rgba(251,191,36,0.45)'}`,
             borderRadius: 16,
             padding: '16px 18px',
             cursor: 'pointer',
@@ -163,7 +163,7 @@ export function VinePage({ onQuickStart }: Props) {
             <span style={{ fontSize: 12, fontWeight: 700, color: '#B45309', letterSpacing: 0.5 }}>建议任务</span>
           </div>
           <p style={{ fontSize: 16, fontWeight: 600, color: '#78350F', lineHeight: 1.45, marginBottom: 8 }}>
-            {recommendedTask.content}
+            {(recommendedTask ?? suggested[0])!.content}
           </p>
           <p style={{ fontSize: 13, color: '#D97706', fontWeight: 500 }}>
             {encouragement}
