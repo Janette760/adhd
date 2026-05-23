@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
   const hasInspiration = Array.isArray(inspiration) && inspiration.length > 0;
 
   const inspirationSection = hasInspiration
-    ? `\n\n用户的灵感清单（平时随手记的其他想法，供你参考）：\n${inspiration.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n灵感清单使用规则：\n- 从中挑选 0-2 条加入今日任务（不要全加）\n- 只在主任务量偏少（少于 3 条）或与主任务搭配有助于难易平衡时才加入\n- 灵感清单里的任务同样要拆解成具体可执行的步骤`
+    ? `\n\n用户的灵感清单（平时随手记的其他想法，供你参考）：\n${inspiration.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n灵感清单使用规则：\n- 尽量从中选 1-2 条加入今日任务（不要全加）\n- 优先选择与主任务搭配、有助于难易平衡或调节节奏的条目\n- 灵感清单里的任务同样要拆解成具体可执行的步骤`
     : '';
 
   try {
